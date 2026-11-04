@@ -226,7 +226,7 @@ const btnCenter = (sel) => `(() => { const r = document.querySelector('${sel}').
     await cdp.shot('/tmp/queens-win-daily.png');
     await tapSel('#btnShare'); await sleep(200);
     const copied = await q('window.__copied');
-    gate('nút Chia sẻ chép dòng kết quả', /^Queens \d\d\/\d\d · 8×8 · \d\d:\d\d · \d+ gợi ý 🔥1 play\.bomclaw\.org\/queens$/.test(copied), copied);
+    gate('nút Chia sẻ chép dòng kết quả', /^Queens \d\d\/\d\d · 8×8 · \d\d:\d\d · \d+ gợi ý 🔥1 https:\/\/queens\.bomclaw\.org$/.test(copied), copied);
     gate('dòng chia sẻ không chứa bàn cờ', !/[👑⬛⬜🟥🟦🟩🟨🟪🟧]|\n/u.test(copied));
     const streak3 = await q(`(() => { const d = new Date(), o = {}; for (let k = 0; k < 3; k++) { const x = new Date(d); x.setDate(d.getDate() - k); o[x.getFullYear() + '-' + String(x.getMonth() + 1).padStart(2, '0') + '-' + String(x.getDate()).padStart(2, '0')] = 60; } return window.__queens.streakOf(o); })()`);
     gate('streak đếm ngày liên tiếp', streak3 === 3, String(streak3));

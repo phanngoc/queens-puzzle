@@ -283,7 +283,7 @@
     save();
     var now = new Date();
     G.shareText = 'Queens ' + (G.mode === 'daily' ? String(now.getDate()).padStart(2, '0') + '/' + String(now.getMonth() + 1).padStart(2, '0') + ' · ' : '') +
-      G.n + '×' + G.n + ' · ' + fmt(sec) + ' · ' + G.hints + ' gợi ý' + (streak > 0 ? ' 🔥' + streak : '') + ' play.bomclaw.org/queens';
+      G.n + '×' + G.n + ' · ' + fmt(sec) + ' · ' + G.hints + ' gợi ý' + (streak > 0 ? ' 🔥' + streak : '') + ' https://queens.bomclaw.org';
 
     var score = Math.max(1, SCORE_BASE - sec - HINT_PENALTY * G.hints);
     if (window.ArcadeGame) {
