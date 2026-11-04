@@ -52,6 +52,15 @@
     var d = new Date();
     return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
   }
+  function keyOf(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+  // 🔥 chuỗi ngày: số ngày liên tiếp (tính tới hôm nay, hoặc hôm qua nếu hôm nay chưa giải) có giải đề hôm nay
+  function streakOf(daily) {
+    daily = daily || {};
+    var d = new Date(), n = 0;
+    if (daily[keyOf(d)] == null) d.setDate(d.getDate() - 1);
+    while (daily[keyOf(d)] != null) { n++; d.setDate(d.getDate() - 1); }
+    return n;
+  }
   function fmt(sec) {
     sec = Math.floor(sec);
     return String(Math.floor(sec / 60)).padStart(2, '0') + ':' + String(sec % 60).padStart(2, '0');
@@ -269,14 +278,19 @@
     store.best = store.best || {};
     var key = bestKey(G.n, G.diff), prev = store.best[key], isRecord = false;
     if (!G.hints && (prev == null || sec < prev)) { store.best[key] = sec; isRecord = prev != null; }
-    if (G.mode === 'daily') { store.daily = store.daily || {}; store.daily[G.dateKey] = sec; }
+    if (G.mode === 'daily') { store.daily = store.daily || {}; if (store.daily[G.dateKey] == null || sec < store.daily[G.dateKey]) store.daily[G.dateKey] = sec; }
+    var streak = streakOf(store.daily);
     save();
+    var now = new Date();
+    G.shareText = 'Queens ' + (G.mode === 'daily' ? String(now.getDate()).padStart(2, '0') + '/' + String(now.getMonth() + 1).padStart(2, '0') + ' · ' : '') +
+      G.n + '×' + G.n + ' · ' + fmt(sec) + ' · ' + G.hints + ' gợi ý' + (streak > 0 ? ' 🔥' + streak : '') + ' https://queens.bomclaw.org';
 
     var score = Math.max(1, SCORE_BASE - sec - HINT_PENALTY * G.hints);
     if (window.ArcadeGame) {
       ArcadeGame.onScore('alltime', score);
       if (G.mode === 'daily') ArcadeGame.onScore('daily', score);
       if (ArcadeGame.track) ArcadeGame.track('win', { n: G.n, diff: G.diff, sec: sec, hints: G.hints });
+      if (ArcadeGame.track && G.mode === 'daily') ArcadeGame.track('daily_win', { streak: streak, hints: G.hints });
     }
 
     // Vương miện nhảy lần lượt theo hàng.
@@ -292,6 +306,7 @@
     $('wBest').textContent = store.best[key] != null ? fmt(store.best[key]) : '—';
     $('wHints').textContent = G.hints;
     $('wSolved').textContent = store.wins;
+    $('wStreak').textContent = streak > 0 ? '🔥' + streak : '—';
     $('btnWinNext').textContent = G.mode === 'daily' ? 'Luyện tập' : 'Ván mới';
     setTimeout(function () { $('winModal').classList.remove('hidden'); }, G.n * 90 + 350);
     render();
@@ -390,10 +405,19 @@
   resumeOrStart((store.current && store.current.lastMode) || 'practice');
   if (!store.seenRules) $('rulesModal').classList.remove('hidden');
 
+  $('btnShare').addEventListener('click', function () {
+    var text = (G && G.shareText) || '', btn = this;
+    function done(ok) { btn.textContent = ok ? 'Đã chép ✓' : 'Chia sẻ'; setTimeout(function () { btn.textContent = 'Chia sẻ'; }, 1800); }
+    if (window.ArcadeGame && ArcadeGame.track) ArcadeGame.track('share', { mode: G && G.mode });
+    if (navigator.share) { navigator.share({ text: text }).then(function () { done(true); }, function () {}); return; }
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(function () { done(true); }, function () { done(false); });
+    else { var ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta); ta.select(); try { document.execCommand('copy'); done(true); } catch (e) { done(false); } ta.remove(); }
+  });
+
   // Lộ ra cho playtest headless.
   window.__queens = {
     get state() { return G; },
     tap: function (i) { var v = G.cells[i]; setCells([{ i: i, from: v, to: (v + 1) % 3 }]); },
-    hint: showHint, apply: applyHint
+    hint: showHint, apply: applyHint, streakOf: streakOf
   };
 })();

@@ -8,7 +8,7 @@ const fs = require('node:fs');
 // ws: thử gói cài riêng trước, rồi tới node_modules của platform (khi game nằm
 // trong repo games/). Clone lẻ mà thiếu cả hai thì nói rõ phải làm gì.
 let WebSocket;
-for (const p of ['ws', '../../node_modules/ws']) {
+for (const p of ['ws', '../../node_modules/ws', require('node:path').join(require('node:os').homedir(), 'goterm-workspace/games/node_modules/ws')]) {
   try { WebSocket = require(p); break; } catch (e) { /* thử tiếp */ }
 }
 if (!WebSocket) {
@@ -16,9 +16,12 @@ if (!WebSocket) {
   process.exit(2);
 }
 
-const URL = process.argv[2] || 'http://127.0.0.1:8791/';
+const SRV_PORT = 8890 + Math.floor(Math.random() * 90);
+const URL = process.argv[2] || `http://127.0.0.1:${SRV_PORT}/`;
 const CHROME = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
-const PORT = 9333;
+// CDP port chosen by Chrome (--remote-debugging-port=0, read from DevToolsActivePort):
+// a fixed port lets a concurrent harness attach to this Chrome.
+let PORT = 0;
 const VW = 390, VH = 844, VDPR = 3;      // iPhone 14 Pro — viewport mục tiêu của skill
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -93,9 +96,11 @@ const btnCenter = (sel) => `(() => { const r = document.querySelector('${sel}').
   return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; })()`;
 
 (async function main() {
+  const srv = process.argv[2] ? null : spawn(process.execPath, [require('node:path').join(__dirname, '..', 'server.js')], { env: { ...process.env, PORT: String(SRV_PORT) }, stdio: 'ignore' });
+  await sleep(300);
   const profile = fs.mkdtempSync('/tmp/queens-chrome-');
   const chrome = spawn(CHROME, [
-    '--headless=new', `--remote-debugging-port=${PORT}`, `--user-data-dir=${profile}`,
+    '--headless=new', '--no-sandbox', '--remote-debugging-port=0', `--user-data-dir=${profile}`,
     '--no-first-run', '--no-default-browser-check', '--disable-gpu', '--hide-scrollbars',
     '--mute-audio', `--window-size=${VW},${VH}`, 'about:blank'
   ], { stdio: 'ignore' });
@@ -107,6 +112,8 @@ const btnCenter = (sel) => `(() => { const r = document.querySelector('${sel}').
   const S = () => q('(() => { const g = window.__queens.state; return { n: g.n, cells: g.cells.slice(), solved: g.solved, sol: g.P.solution, seed: g.seed, mode: g.mode, hints: g.hints, diff: g.diff }; })()');
 
   try {
+    for (let i = 0; i < 60 && !PORT; i++) { try { PORT = +fs.readFileSync(require('node:path').join(profile, 'DevToolsActivePort'), 'utf8').split('\n')[0]; } catch (e) { await sleep(200); } }
+    if (!PORT) throw new Error('Chrome did not write DevToolsActivePort');
     for (let i = 0; i < 60; i++) { try { await getJSON('/json/version'); break; } catch (e) { await sleep(200); } }
     const page = (await getJSON('/json/list')).find((t) => t.type === 'page');
     cdp = new CDP(page.webSocketDebuggerUrl);
@@ -209,6 +216,21 @@ const btnCenter = (sel) => `(() => { const r = document.querySelector('${sel}').
     gate('đề hôm nay = 8×8, seed theo ngày', s.mode === 'daily' && s.n === 8 && s.seed === seed, 'seed ' + s.seed);
     await cdp.shot('/tmp/queens-daily.png');
 
+    // Giải đề hôm nay → màn thắng có 🔥 chuỗi ngày + nút Chia sẻ chép 1 dòng, không có bàn cờ.
+    await q(`(navigator.share = undefined, window.__copied = '', navigator.clipboard && (navigator.clipboard.writeText = (t) => { window.__copied = t; return Promise.resolve(); }), 0)`);
+    guard = 0;
+    while (!s.solved && guard++ < 300) { await q(`(window.__queens.hint(), window.__queens.apply(), 0)`); s = await S(); }
+    await sleep(8 * 90 + 700);
+    const streakTxt = await q(`document.getElementById('wStreak').textContent`);
+    gate('thắng đề hôm nay → màn thắng hiện 🔥1', s.solved && streakTxt === '🔥1', streakTxt);
+    await cdp.shot('/tmp/queens-win-daily.png');
+    await tapSel('#btnShare'); await sleep(200);
+    const copied = await q('window.__copied');
+    gate('nút Chia sẻ chép dòng kết quả', /^Queens \d\d\/\d\d · 8×8 · \d\d:\d\d · \d+ gợi ý 🔥1 https:\/\/queens\.bomclaw\.org$/.test(copied), copied);
+    gate('dòng chia sẻ không chứa bàn cờ', !/[👑⬛⬜🟥🟦🟩🟨🟪🟧]|\n/u.test(copied));
+    const streak3 = await q(`(() => { const d = new Date(), o = {}; for (let k = 0; k < 3; k++) { const x = new Date(d); x.setDate(d.getDate() - k); o[x.getFullYear() + '-' + String(x.getMonth() + 1).padStart(2, '0') + '-' + String(x.getDate()).padStart(2, '0')] = 60; } return window.__queens.streakOf(o); })()`);
+    gate('streak đếm ngày liên tiếp', streak3 === 3, String(streak3));
+
     const late = cdp.events.filter((e) => e.method === 'Runtime.exceptionThrown');
     gate('0 exception JS suốt phiên chơi', late.length === 0, late.length ? JSON.stringify(late[0]).slice(0, 300) : 'sạch');
   } catch (e) {
@@ -217,6 +239,7 @@ const btnCenter = (sel) => `(() => { const r = document.querySelector('${sel}').
   } finally {
     if (cdp) cdp.ws.close();
     chrome.kill('SIGKILL');
+    if (srv) try { srv.kill(); } catch (e) {}
     fs.rmSync(profile, { recursive: true, force: true });
     const bad = results.filter((r) => !r.ok);
     console.log('\n' + (results.length - bad.length) + '/' + results.length + ' cổng pass');
