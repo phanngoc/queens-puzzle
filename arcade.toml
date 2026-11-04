@@ -1,0 +1,16 @@
+[game]
+id      = "queens"
+name    = "Queens"
+version = "1.0.0"
+engine  = "dom"
+orientation = "portrait"
+
+[runtime]
+mode = "offline"
+
+[capabilities]
+save        = true
+leaderboard = ["daily", "alltime"]
+
+[limits]
+bundle_bytes = 5242880

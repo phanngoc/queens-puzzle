@@ -1,0 +1,35 @@
+{
+  "id": "queens",
+  "title": "QUEENS — Nữ hoàng & Lãnh thổ",
+  "genre": "puzzle",
+  "loop": "Nhìn lưới N×N chia N vùng màu, suy luận rồi đặt N quân hậu sao cho mỗi hàng, mỗi cột, mỗi vùng màu có đúng 1 hậu và không 2 hậu nào chạm nhau (kể cả chéo); giải xong → câu đố mới khó hơn.",
+  "mode": "offline",
+  "maxPlayers": 1,
+  "entities": [
+    { "name": "cell", "props": ["row", "col", "region", "state: empty|mark|queen"] },
+    { "name": "region", "props": ["id", "color"] }
+  ],
+  "rules": [
+    "Lưới N×N (N = 6..9), chia thành đúng N vùng màu liên thông.",
+    "Mỗi hàng có đúng 1 hậu.",
+    "Mỗi cột có đúng 1 hậu.",
+    "Mỗi vùng màu có đúng 1 hậu.",
+    "Hai hậu không được chạm nhau, kể cả theo đường chéo (8 ô xung quanh).",
+    "Mỗi câu đố có ĐÚNG MỘT lời giải (generator kiểm bằng solver đếm nghiệm, dừng ở 2)."
+  ],
+  "controls": {
+    "mobile": "chạm 1 lần = đánh dấu ×, chạm lần 2 = đặt hậu, lần 3 = xoá; kéo ngón tay qua nhiều ô = đánh × hàng loạt",
+    "desktop": "click giống mobile; Z = hoàn tác, H = gợi ý"
+  },
+  "features": ["tự đánh × vùng bị hậu chặn (bật/tắt)", "tô đỏ hậu xung đột", "gợi ý 1 bước suy luận có giải thích", "hoàn tác", "đồng hồ + kỷ lục theo cỡ", "câu đố ngày (seed theo ngày, ai cũng cùng đề)"],
+  "winCondition": "Đặt đủ N hậu và checker xác nhận cả 4 luật đều thỏa → màn thắng hiện thời gian.",
+  "loseCondition": "Không có thua; chỉ có thời gian và số lần dùng gợi ý.",
+  "artDirection": "Portrait, nền tối giống Rumba, vùng màu pastel tương phản cao (an toàn cho mù màu: mỗi vùng thêm hoa văn mờ), hậu ♛ vàng, UI tiếng Việt.",
+  "template": "canvas2d-offline",
+  "balance": [
+    { "param": "GRID_MIN", "constraint": ">= 5", "why": "N ≤ 4 không đặt được N hậu không chạm nhau (N=2,3 vô nghiệm, N=4 quá dễ)" },
+    { "param": "REGION_COUNT", "constraint": "== N", "why": "khác N thì luật 1 hậu/vùng mâu thuẫn với 1 hậu/hàng" },
+    { "param": "unique solution", "constraint": "solver count == 1 trên mọi đề phát ra", "why": "đề 2 nghiệm thì suy luận logic bị kẹt, người chơi phải đoán" },
+    { "param": "GEN_TIMEOUT_MS", "constraint": "<= 300 trên mobile", "why": "sinh đề lâu thì bấm 'ván mới' tưởng bị treo" }
+  ]
+}
